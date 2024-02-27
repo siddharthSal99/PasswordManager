@@ -12,12 +12,15 @@ import (
 func (s *Server) retrieveCredentialsFromRedis(rds *redis.Client, key string) (string, string, error) {
 
 	kv, err := s.retrieveRedis(context.Background(), rds, key)
+	if err != nil {
+		return "", "", err
+	}
 	storedPwdCipher := kv["pwdCipher"]
 	userid := kv["userid"]
 
 	password, err := s.decryptString(storedPwdCipher)
 	if err != nil {
-		return "", "", nil
+		return "", "", err
 	}
 	return userid, password, nil
 }

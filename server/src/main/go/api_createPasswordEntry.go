@@ -75,7 +75,36 @@ func (s *Server) CreatePasswordEntry(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no password provided in post body"})
 	}
 
+	/*
+		Connect to auth db, check if the email exists in the auth db
+	*/
 	url := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		s.authDbUsername,
+		s.authDbPassword,
+		s.authDbHost,
+		s.authDbPort,
+		s.authDbName)
+
+	// Connect using pgx
+	authdbConn, err := pgx.Connect(context.Background(), url)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"msg": "Server Error - database connection",
+		})
+		return
+	}
+	defer authdbConn.Close(context.Background())
+
+	// Check if email is in auth db
+	if !isAuthorized(authdbConn, email) {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"msg": "this email is not authorized to access this resource",
+		})
+		return
+	}
+
+	url = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		s.credsDbUsername,
 		s.credsDbPassword,
 		s.credsDbHost,
