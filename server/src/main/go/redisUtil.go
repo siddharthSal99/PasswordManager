@@ -9,20 +9,33 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func connectToRedis(addr string, password string, db int) *redis.Client {
+func (s *Server) retrieveCredentialsFromRedis(rds *redis.Client, key string) (string, string, error) {
+
+	kv, err := s.retrieveRedis(context.Background(), rds, key)
+	storedPwdCipher := kv["pwdCipher"]
+	userid := kv["userid"]
+
+	password, err := s.decryptString(storedPwdCipher)
+	if err != nil {
+		return "", "", nil
+	}
+	return userid, password, nil
+}
+
+func (s *Server) connectToRedis() *redis.Client {
 	return redis.NewClient(&redis.Options{
-		Addr:     addr,     // Assuming Redis is running on localhost
-		Password: password, // No password set
-		DB:       db,       // Use default DB
+		Addr:     s.redisHost + ":" + s.redisPort, // Assuming Redis is running on localhost
+		Password: s.redisPassword,                 // No password set
+		DB:       0,                               // Use default DB
 	})
 }
 
-func setRedisTTL(ctx context.Context, rdb *redis.Client, key string, d time.Duration) error {
+func (s *Server) setRedisTTL(ctx context.Context, rdb *redis.Client, key string, d time.Duration) error {
 	_, err := rdb.Expire(ctx, key, d).Result()
 	return err
 }
 
-func storeRedis(ctx context.Context,
+func (s *Server) storeRedis(ctx context.Context,
 	rdb *redis.Client,
 	key string,
 	validationCode string,
@@ -34,7 +47,7 @@ func storeRedis(ctx context.Context,
 
 }
 
-func retrieveRedis(ctx context.Context, rdb *redis.Client, key string) (map[string]string, error) {
+func (s *Server) retrieveRedis(ctx context.Context, rdb *redis.Client, key string) (map[string]string, error) {
 	kv, err := rdb.HGetAll(ctx, key).Result()
 	if err != nil {
 		return nil, err
@@ -43,7 +56,7 @@ func retrieveRedis(ctx context.Context, rdb *redis.Client, key string) (map[stri
 	}
 }
 
-func hashAndSalt(pwd []byte) string {
+func (s *Server) hashAndSalt(pwd []byte) string {
 
 	hash, err := bcrypt.GenerateFromPassword(pwd, bcrypt.MinCost)
 	if err != nil {
@@ -51,9 +64,4 @@ func hashAndSalt(pwd []byte) string {
 	}
 
 	return string(hash)
-}
-
-func checkPassword(hash, password string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
 }

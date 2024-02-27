@@ -67,8 +67,8 @@ func main() {
 	/*
 		API route definitions
 	*/
-	router.GET("/password", s.GetPasswordIfExists)
-	router.GET("/password/validate", s.ValidateCode)
+	router.GET("/password", s.AuthorizeAndCacheCredentials)
+	router.GET("/password/validate", s.ValidateCodeAndRetrievePassword)
 	router.PUT("/password", s.UpdatePassword)
 	router.POST("/password", s.CreatePasswordEntry)
 	router.DELETE("/password", s.DeletePassword)

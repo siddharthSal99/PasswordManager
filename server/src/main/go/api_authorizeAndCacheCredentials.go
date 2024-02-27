@@ -13,16 +13,22 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
+func (s *Server) checkPassword(hash, password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
 // decryptString decrypts a string with the given key
-func decryptString(cipherText, key string) (string, error) {
+func (s *Server) decryptString(cipherText string) (string, error) {
 	data, err := hex.DecodeString(cipherText)
 	if err != nil {
 		return "", err
 	}
 
-	block, err := aes.NewCipher([]byte(key))
+	block, err := aes.NewCipher([]byte(s.encryptionKey))
 	if err != nil {
 		return "", err
 	}
@@ -66,7 +72,7 @@ func getCredentials(conn *pgx.Conn, email string, site string) (string, string, 
 	return userid, password, nil
 }
 
-func (s *Server) GetPasswordIfExists(c *gin.Context) {
+func (s *Server) AuthorizeAndCacheCredentials(c *gin.Context) {
 	var email string
 	var site string
 	/*
@@ -166,12 +172,12 @@ func (s *Server) GetPasswordIfExists(c *gin.Context) {
 	// fmt.Sprintf("%s, %s", password, userid)
 
 	// Connect to redis
-	rds := connectToRedis(fmt.Sprintf("%s:%s", s.redisHost, s.redisPort), s.redisPassword, 0)
+	rds := s.connectToRedis()
 	defer rds.Close()
 
 	// store the code, email, site, username, password in redis
 	key := email + ":" + site
-	err = storeRedis(context.Background(), rds, key, hashAndSalt([]byte(code)), pwdCipher, userid)
+	err = s.storeRedis(context.Background(), rds, key, s.hashAndSalt([]byte(code)), pwdCipher, userid)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"msg": "Server Error - validation code generation",
@@ -179,7 +185,7 @@ func (s *Server) GetPasswordIfExists(c *gin.Context) {
 		return
 	}
 
-	if err = setRedisTTL(context.Background(), rds, key, 2*time.Minute); err != nil {
+	if err = s.setRedisTTL(context.Background(), rds, key, 2*time.Minute); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"msg": "Server Error - validation code generation",
 		})
