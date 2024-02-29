@@ -11,7 +11,7 @@ import (
 
 func (s *Server) retrieveCredentialsFromRedis(rds *redis.Client, key string) (string, string, error) {
 
-	kv, err := s.retrieveRedis(context.Background(), rds, key)
+	kv, err := s.retrieveFromCache(context.Background(), rds, key)
 	if err != nil {
 		return "", "", err
 	}
@@ -25,11 +25,19 @@ func (s *Server) retrieveCredentialsFromRedis(rds *redis.Client, key string) (st
 	return userid, password, nil
 }
 
-func (s *Server) connectToRedis() *redis.Client {
+func (s *Server) connectToCredsCache() *redis.Client {
 	return redis.NewClient(&redis.Options{
-		Addr:     s.redisHost + ":" + s.redisPort, // Assuming Redis is running on localhost
-		Password: s.redisPassword,                 // No password set
-		DB:       0,                               // Use default DB
+		Addr:     s.credsCacheHost + ":" + s.credsCachePort, // Assuming Redis is running on localhost
+		Password: s.credsCachePassword,                      // No password set
+		DB:       0,                                         // Use default DB
+	})
+}
+
+func (s *Server) connectToAuthTokenCache() *redis.Client {
+	return redis.NewClient(&redis.Options{
+		Addr:     s.authTokenCacheHost + ":" + s.authTokenCachePort, // Assuming Redis is running on localhost
+		Password: s.authTokenCachePassword,                          // No password set
+		DB:       0,                                                 // Use default DB
 	})
 }
 
@@ -38,7 +46,7 @@ func (s *Server) setRedisTTL(ctx context.Context, rdb *redis.Client, key string,
 	return err
 }
 
-func (s *Server) storeRedis(ctx context.Context,
+func (s *Server) storeInCredsCache(ctx context.Context,
 	rdb *redis.Client,
 	key string,
 	validationCode string,
@@ -50,7 +58,17 @@ func (s *Server) storeRedis(ctx context.Context,
 
 }
 
-func (s *Server) retrieveRedis(ctx context.Context, rdb *redis.Client, key string) (map[string]string, error) {
+func (s *Server) storeInAuthTokenCache(ctx context.Context,
+	rdb *redis.Client,
+	key string,
+	authToken string) error {
+	// return rdb.Set(ctx, key, value, d).Err()
+	_, err := rdb.HSet(ctx, key, "authToken", authToken).Result()
+	return err
+
+}
+
+func (s *Server) retrieveFromCache(ctx context.Context, rdb *redis.Client, key string) (map[string]string, error) {
 	kv, err := rdb.HGetAll(ctx, key).Result()
 	if err != nil {
 		return nil, err

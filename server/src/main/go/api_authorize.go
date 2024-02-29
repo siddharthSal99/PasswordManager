@@ -4,12 +4,10 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"net/http"
-	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -72,9 +70,16 @@ func getCredentials(conn *pgx.Conn, email string, site string) (string, string, 
 	return userid, password, nil
 }
 
-func (s *Server) AuthorizeAndCacheCredentials(c *gin.Context) {
+func GenerateSecureToken(length int) string {
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(b)
+}
+
+func (s *Server) Authorize(c *gin.Context) {
 	var email string
-	var site string
 	/*
 		Extract the query parameters for email and site
 	*/
@@ -83,15 +88,6 @@ func (s *Server) AuthorizeAndCacheCredentials(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"msg": "No email provided",
-		})
-		return
-	}
-
-	if val, ok := c.GetQuery("site"); ok {
-		site = val
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"msg": "No site provided",
 		})
 		return
 	}
@@ -119,88 +115,32 @@ func (s *Server) AuthorizeAndCacheCredentials(c *gin.Context) {
 
 	// Check if email is in auth db
 	if !isAuthorized(authdbConn, email) {
+		c.SetCookie("sspassman-auth", "", -1, "/", "", true, true)
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"msg": "this email is not authorized to access this resource",
 		})
-		return
-	}
-
-	/*
-		Get uid and password from creds db and make sure it exists.
-	*/
-	url = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		s.credsDbUsername,
-		s.credsDbPassword,
-		s.credsDbHost,
-		s.credsDbPort,
-		s.credsDbName)
-
-	// Connect using pgx
-	credsdbConn, err := pgx.Connect(context.Background(), url)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "Server Error - database connection",
+	} else {
+		token := GenerateSecureToken(16)
+		rds := s.connectToAuthTokenCache()
+		defer rds.Close()
+		err = s.storeInAuthTokenCache(context.Background(), rds, email, token)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"msg": "Server Error - database connection",
+			})
+			return
+		}
+		err = s.setRedisTTL(context.Background(), rds, email, 600)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"msg": "Server Error - database connection",
+			})
+			return
+		}
+		c.SetCookie("sspassman-auth", token, 600, "/", "", true, true)
+		c.JSON(http.StatusOK, gin.H{
+			"msg": "authorized",
 		})
-		return
 	}
-	defer credsdbConn.Close(context.Background())
-
-	userid, pwdCipher, err := getCredentials(credsdbConn, email, site)
-
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"msg": fmt.Sprintf("Credentials not found for email: %s and site: %s", email, site),
-		})
-		return
-	}
-
-	// c.JSON(http.StatusOK, gin.H{
-	// 	"msg": fmt.Sprintf("Credentials: username: %s, password: %s ", userid, pwd),
-	// })
-
-	/*
-		Validate the email with a code
-	*/
-	// Generate the code
-	code := ""
-	for i := 0; i < 6; i++ {
-		code += strconv.Itoa(rand.Intn(10))
-	}
-	fmt.Println("code:", code)
-
-	// fmt.Sprintf("%s, %s", password, userid)
-
-	// Connect to redis
-	rds := s.connectToRedis()
-	defer rds.Close()
-
-	// store the code, email, site, username, password in redis
-	key := email + ":" + site
-	err = s.storeRedis(context.Background(), rds, key, s.hashAndSalt([]byte(code)), pwdCipher, userid)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "Server Error - validation code generation",
-		})
-		return
-	}
-
-	if err = s.setRedisTTL(context.Background(), rds, key, 2*time.Minute); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "Server Error - validation code generation",
-		})
-		return
-	}
-
-	/*
-		This code will really be in the /password/validate endpoint
-	*/
-
-	/*
-		Respond with the retrieved password after validation
-	*/
-	c.JSON(http.StatusOK, gin.H{
-		"msg": "Code generated",
-	})
 
 }

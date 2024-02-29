@@ -21,9 +21,13 @@ type Server struct {
 	authDbPassword string
 	authDbName     string
 
-	redisHost     string
-	redisPort     string
-	redisPassword string
+	credsCacheHost     string
+	credsCachePort     string
+	credsCachePassword string
+
+	authTokenCacheHost     string
+	authTokenCachePort     string
+	authTokenCachePassword string
 
 	encryptionKey string
 }
@@ -42,9 +46,13 @@ func (s *Server) Init() {
 	s.authDbPassword = os.Getenv("authDbPassword")
 	s.authDbName = os.Getenv("authDbName")
 
-	s.redisHost = os.Getenv("redisHost")
-	s.redisPort = os.Getenv("redisPort")
-	s.redisPassword = os.Getenv("redisPassword")
+	s.credsCacheHost = os.Getenv("credsCacheHost")
+	s.credsCachePort = os.Getenv("credsCachePort")
+	s.credsCachePassword = os.Getenv("credsCachePassword")
+
+	s.authTokenCacheHost = os.Getenv("authTokenCacheHost")
+	s.authTokenCachePort = os.Getenv("authTokenCachePort")
+	s.authTokenCachePassword = os.Getenv("authTokenCachePassword")
 
 	s.encryptionKey = os.Getenv("encryptionKey")
 }
@@ -67,7 +75,7 @@ func main() {
 	/*
 		API route definitions
 	*/
-	router.GET("/password", s.AuthorizeAndCacheCredentials)
+	router.GET("/password", s.Authorize)
 	router.GET("/password/validate", s.ValidateCodeAndRetrievePassword)
 	router.PUT("/password", s.UpdatePassword)
 	router.POST("/password", s.CreatePasswordEntry)

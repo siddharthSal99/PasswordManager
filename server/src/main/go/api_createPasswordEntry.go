@@ -8,7 +8,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	mathrand "math/rand"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -120,7 +123,7 @@ func (s *Server) CreatePasswordEntry(c *gin.Context) {
 		return
 	}
 	defer credsdbConn.Close(context.Background())
-	encryptedPassword, err := encryptString(password, s.encryptionKey)
+	pwdCipher, err := encryptString(password, s.encryptionKey)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -129,17 +132,31 @@ func (s *Server) CreatePasswordEntry(c *gin.Context) {
 		return
 	}
 
-	err = insertCredentialsIntoCredsDb(credsdbConn, email, site, userid, encryptedPassword)
+	code := ""
+	for i := 0; i < 6; i++ {
+		code += strconv.Itoa(mathrand.Intn(10))
+	}
+	fmt.Println("code:", code)
 
+	// Connect to redis
+	rds := s.connectToCredsCache()
+	defer rds.Close()
+
+	// store the code, email, site, username, password in redis
+	key := email + ":" + site
+	err = s.storeInCredsCache(context.Background(), rds, key, s.hashAndSalt([]byte(code)), pwdCipher, userid)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "Server Error - database error",
+			"msg": "Server Error - validation code generation",
 		})
 		return
 	}
 
-	c.JSON(http.StatusInternalServerError, gin.H{
-		"msg": fmt.Sprintf("Success - added credentials for email: %s, site: %s", email, site),
-	})
+	if err = s.setRedisTTL(context.Background(), rds, key, 2*time.Minute); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"msg": "Server Error - validation code generation",
+		})
+		return
+	}
 
 }

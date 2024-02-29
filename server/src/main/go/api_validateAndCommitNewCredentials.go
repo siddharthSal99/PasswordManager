@@ -2,25 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
+	"github.com/jackc/pgx/v5"
 )
 
-func (s *Server) validate(rds *redis.Client, code string, key string) (bool, error) {
-
-	kv, err := s.retrieveFromCache(context.Background(), rds, key)
-	hashedCode := kv["validationCode"]
-	if err != nil {
-		return false, err
-	}
-
-	return s.checkPassword(hashedCode, code), nil
-
-}
-
-func (s *Server) ValidateCodeAndRetrievePassword(c *gin.Context) {
+func (s *Server) ValidateAndCommitNewCredentials(c *gin.Context) {
 
 	var code string
 	var email string
@@ -68,11 +57,41 @@ func (s *Server) ValidateCodeAndRetrievePassword(c *gin.Context) {
 				})
 				return
 			}
+			url := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+				s.credsDbUsername,
+				s.credsDbPassword,
+				s.credsDbHost,
+				s.credsDbPort,
+				s.credsDbName)
+
+			credsdbConn, err := pgx.Connect(context.Background(), url)
+
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"msg": "Server Error - database connection",
+				})
+				return
+			}
+			defer credsdbConn.Close(context.Background())
+			pwdCipher, err := encryptString(password, s.encryptionKey)
+
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"msg": "Server Error - encryption error",
+				})
+				return
+			}
+			err = insertCredentialsIntoCredsDb(credsdbConn, email, site, userid, pwdCipher)
+
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"msg": "Server Error - database error",
+				})
+				return
+			}
+
 			c.JSON(http.StatusOK, gin.H{
-				"msg": gin.H{
-					"userid":   userid,
-					"password": password,
-				},
+				"msg": "committed credentials",
 			})
 			return
 		} else {
