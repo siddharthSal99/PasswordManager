@@ -8,14 +8,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
 )
-
-func isAuthorized(conn *pgx.Conn, email string) bool {
-	var res string
-	err := conn.QueryRow(context.Background(), "SELECT role FROM authorized WHERE email=$1", email).Scan(&res)
-	return err == nil
-}
 
 func (s *Server) createAndStoreCode(email string, site string) (string, error) {
 	// Generate the code
@@ -69,29 +62,9 @@ func (s *Server) AuthorizeAndSendCode(c *gin.Context) {
 		})
 		return
 	}
-	/*
-		Connect to auth db, check if the email exists in the auth db
-	*/
-	url := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		s.authDbUsername,
-		s.authDbPassword,
-		s.authDbHost,
-		s.authDbPort,
-		s.authDbName)
-
-	// Connect using pgx
-	authdbConn, err := pgx.Connect(context.Background(), url)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "Server Error",
-		})
-		return
-	}
-	defer authdbConn.Close(context.Background())
 
 	// Check if email is in auth db
-	if !isAuthorized(authdbConn, email) {
+	if isAuth, err := s.isAuthorized(email); !isAuth || err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"msg": "this email is not authorized to access this resource",
 		})

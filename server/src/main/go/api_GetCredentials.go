@@ -43,6 +43,7 @@ func (s *Server) GetCredentials(c *gin.Context) {
 
 	// retrieve the cached validation code and verify they match
 	rds := s.connectToValidationCodeCache()
+	defer rds.Close()
 	kv, err := s.retrieveValidationCode(rds, email, site)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
