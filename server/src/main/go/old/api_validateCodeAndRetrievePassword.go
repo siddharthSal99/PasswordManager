@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -10,7 +9,7 @@ import (
 
 func (s *Server) validate(rds *redis.Client, code string, key string) (bool, error) {
 
-	kv, err := s.retrieveFromCache(context.Background(), rds, key)
+	kv, err := s.retrieveFromCredsCache(rds, key)
 	hashedCode := kv["validationCode"]
 	if err != nil {
 		return false, err

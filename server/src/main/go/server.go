@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -29,7 +30,8 @@ type Server struct {
 	authTokenCachePort     string
 	authTokenCachePassword string
 
-	encryptionKey string
+	encryptionKey          string
+	validationCodeDuration time.Duration
 }
 
 func (s *Server) Init() {
@@ -55,6 +57,7 @@ func (s *Server) Init() {
 	s.authTokenCachePassword = os.Getenv("authTokenCachePassword")
 
 	s.encryptionKey = os.Getenv("encryptionKey")
+	s.validationCodeDuration = 2 * time.Minute
 }
 
 func main() {
@@ -75,11 +78,29 @@ func main() {
 	/*
 		API route definitions
 	*/
-	router.GET("/password", s.Authorize)
-	router.GET("/password/validate", s.ValidateCodeAndRetrievePassword)
-	router.PUT("/password", s.UpdatePassword)
-	router.POST("/password", s.CreatePasswordEntry)
-	router.DELETE("/password", s.DeletePassword)
+	// router.GET("/password", s.Authorize)
+	// router.GET("/password/validate", s.ValidateCodeAndRetrievePassword)
+	// router.PUT("/password", s.UpdatePassword)
+	// router.POST("/password", s.CreatePasswordEntry)
+	// router.POST("/code", s.SendCode)
+	// router.DELETE("/password", s.DeletePassword)
+
+	/*
+		These CRUD endpoints start by checking if the auth cookie from the browser matches the one in auth token cache
+		if not, then check if the code sent along with the request is valid,
+		then perform the action if the user is authenticated
+
+	*/
+	router.GET("/credentials", s.GetCredentials)
+	router.POST("/credentials", s.CreateNewCredentials)
+	router.PUT("/credentials", s.UpdateCredentials)
+	router.DELETE("/credentials", s.DeleteCredentials)
+
+	/*
+		This endpoint checks if the provided email is in the 'authorized' database,
+		then generates a validation code
+	*/
+	router.GET("/requestCode", s.AuthorizeAndSendCode)
 
 	router.RunTLS(":443", "./certs/sspassman.com+4.pem", "./certs/sspassman.com+4-key.pem")
 

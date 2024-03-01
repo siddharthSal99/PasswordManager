@@ -51,7 +51,7 @@ func (s *Server) RetrieveAndCache(c *gin.Context) {
 	rds := s.connectToAuthTokenCache()
 	defer rds.Close()
 
-	kv, err := s.retrieveFromCache(context.Background(), rds, email)
+	kv, err := s.retrieveFromAuthTokenCache(rds, email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"msg": "Server Error - database connection",
