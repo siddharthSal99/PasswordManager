@@ -12,12 +12,8 @@ import (
 )
 
 func isAuthorized(conn *pgx.Conn, email string) bool {
-	// log.Println("email:", email)
 	var res string
 	err := conn.QueryRow(context.Background(), "SELECT role FROM authorized WHERE email=$1", email).Scan(&res)
-	// if err != nil {
-	// 	log.Println("Error:", err)
-	// }
 	return err == nil
 }
 
@@ -34,7 +30,11 @@ func (s *Server) createAndStoreCode(email string, site string) (string, error) {
 
 	// store the code, email, site in redis
 	key := email + ":" + site
-	err := s.storeValidationCode(context.Background(), credsRds, key, s.hashAndSalt([]byte(code)))
+	saltedCode, err := s.hashAndSalt([]byte(code))
+	if err != nil {
+		return "", err
+	}
+	err = s.storeValidationCode(context.Background(), credsRds, key, saltedCode)
 	if err != nil {
 		return "", err
 	}
