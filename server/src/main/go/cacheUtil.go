@@ -8,9 +8,9 @@ import (
 
 func (s *Server) connectToValidationCodeCache() *redis.Client {
 	return redis.NewClient(&redis.Options{
-		Addr:     s.credsCacheHost + ":" + s.credsCachePort, // Assuming Redis is running on localhost
-		Password: s.credsCachePassword,                      // No password set
-		DB:       0,                                         // Use default DB
+		Addr:     s.validationCacheHost + ":" + s.validationCachePort, // Assuming Redis is running on localhost
+		Password: s.validationCachePassword,                           // No password set
+		DB:       0,                                                   // Use default DB
 	})
 }
 

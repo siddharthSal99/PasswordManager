@@ -83,3 +83,44 @@ func (s *Server) insertCredentialsIntoCredsDb(email string, site string, userId 
 	_, err = credsdbConn.Exec(context.Background(), insertSQL, email, site, userId, encryptedPwd)
 	return err
 }
+
+func (s *Server) updateCredentialsIntoCredsDb(email string, site string, userId string, encryptedPwd string) error {
+	url := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		s.credsDbUsername,
+		s.credsDbPassword,
+		s.credsDbHost,
+		s.credsDbPort,
+		s.credsDbName)
+
+	// Connect using pgx
+	credsdbConn, err := pgx.Connect(context.Background(), url)
+
+	if err != nil {
+		return err
+	}
+	defer credsdbConn.Close(context.Background())
+	updateSQL := `UPDATE credentials SET userid=$3, password=$4 WHERE email=$1 AND site=$2`
+	_, err = credsdbConn.Exec(context.Background(), updateSQL, email, site, userId, encryptedPwd)
+	return err
+}
+
+func (s *Server) deleteCredentialsFromDatabase(email string, site string) error {
+	url := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		s.credsDbUsername,
+		s.credsDbPassword,
+		s.credsDbHost,
+		s.credsDbPort,
+		s.credsDbName)
+
+	// Connect using pgx
+	credsdbConn, err := pgx.Connect(context.Background(), url)
+
+	if err != nil {
+		return err
+	}
+	defer credsdbConn.Close(context.Background())
+
+	deleteSQL := `DELETE FROM credentials WHERE email=$1 AND site=$2`
+	_, err = credsdbConn.Exec(context.Background(), deleteSQL, email, site)
+	return err
+}

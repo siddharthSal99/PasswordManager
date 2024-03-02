@@ -22,13 +22,17 @@ type Server struct {
 	authDbPassword string
 	authDbName     string
 
-	credsCacheHost     string
-	credsCachePort     string
-	credsCachePassword string
+	validationCacheHost     string
+	validationCachePort     string
+	validationCachePassword string
 
 	authTokenCacheHost     string
 	authTokenCachePort     string
 	authTokenCachePassword string
+
+	sourceEmailUsername string
+	sourceEmailHost     string
+	sourceEmailPassword string
 
 	encryptionKey          string
 	validationCodeDuration time.Duration
@@ -48,13 +52,17 @@ func (s *Server) Init() {
 	s.authDbPassword = os.Getenv("authDbPassword")
 	s.authDbName = os.Getenv("authDbName")
 
-	s.credsCacheHost = os.Getenv("credsCacheHost")
-	s.credsCachePort = os.Getenv("credsCachePort")
-	s.credsCachePassword = os.Getenv("credsCachePassword")
+	s.validationCacheHost = os.Getenv("validationCacheHost")
+	s.validationCachePort = os.Getenv("validationCachePort")
+	s.validationCachePassword = os.Getenv("validationCachePassword")
 
 	s.authTokenCacheHost = os.Getenv("authTokenCacheHost")
 	s.authTokenCachePort = os.Getenv("authTokenCachePort")
 	s.authTokenCachePassword = os.Getenv("authTokenCachePassword")
+
+	s.sourceEmailUsername = os.Getenv("sourceEmailUsername")
+	s.sourceEmailPassword = os.Getenv("sourceEmailPassword")
+	s.sourceEmailHost = os.Getenv("sourceEmailHost")
 
 	s.encryptionKey = os.Getenv("encryptionKey")
 	s.validationCodeDuration = 2 * time.Minute
@@ -100,7 +108,7 @@ func main() {
 		This endpoint checks if the provided email is in the 'authorized' database,
 		then generates a validation code
 	*/
-	router.GET("/requestCode", s.AuthorizeAndSendCode)
+	router.GET("/validationCode", s.AuthorizeAndSendCode)
 
 	router.RunTLS(":443", "./certs/sspassman.com+4.pem", "./certs/sspassman.com+4-key.pem")
 

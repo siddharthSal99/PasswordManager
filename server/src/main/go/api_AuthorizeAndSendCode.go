@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	mathrand "math/rand"
 	"net/http"
 	"strconv"
@@ -32,11 +31,6 @@ func (s *Server) createAndStoreCode(email string, site string) (string, error) {
 		return "", err
 	}
 	return code, nil
-}
-
-func sendCode(code string, email string) {
-	// TODO: Implement email service send code.
-	fmt.Println("code:", code, "email:", email)
 }
 
 func (s *Server) AuthorizeAndSendCode(c *gin.Context) {
@@ -72,10 +66,17 @@ func (s *Server) AuthorizeAndSendCode(c *gin.Context) {
 		code, err := s.createAndStoreCode(email, site)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"msg": "Server Error",
+				"msg": "Server Error:" + err.Error(),
 			})
+			return
 		}
-		sendCode(code, email)
+		err = s.sendCode(code, email)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"msg": "Server Error:" + err.Error(),
+			})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"msg": "code sent",
 		})
