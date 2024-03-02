@@ -33,6 +33,7 @@ type Server struct {
 	sourceEmailUsername string
 	sourceEmailHost     string
 	sourceEmailPassword string
+	sourceEmailServer   string
 
 	encryptionKey          string
 	validationCodeDuration time.Duration
@@ -63,6 +64,7 @@ func (s *Server) Init() {
 	s.sourceEmailUsername = os.Getenv("sourceEmailUsername")
 	s.sourceEmailPassword = os.Getenv("sourceEmailPassword")
 	s.sourceEmailHost = os.Getenv("sourceEmailHost")
+	s.sourceEmailServer = os.Getenv("sourceEmailServer")
 
 	s.encryptionKey = os.Getenv("encryptionKey")
 	s.validationCodeDuration = 2 * time.Minute

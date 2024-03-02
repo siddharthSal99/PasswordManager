@@ -22,7 +22,7 @@ func (s *Server) sendCode(code string, email string) error {
 
 	// Settings for SMTP server
 	// fmt.Println("username:", s.sourceEmailUsername, "password:", s.sourceEmailPassword)
-	d := gomail.NewDialer("smtp.gmail.com", 587, s.sourceEmailUsername+"@"+s.sourceEmailHost, s.sourceEmailPassword)
+	d := gomail.NewDialer(s.sourceEmailServer, 587, s.sourceEmailUsername+"@"+s.sourceEmailHost, s.sourceEmailPassword)
 	// d.StartTLSPolicy = gomail.MandatoryStartTLS
 
 	// // This is only needed when SSL/TLS certificate is not valid on server.
